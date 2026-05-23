@@ -1,0 +1,13 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.debugpy",
+    "ms-python.black-formatter",
+    "charliermarsh.ruff",
+    "ms-python.mypy-type-checker",
+    "njpwerner.autodocstring",
+    "tamasfe.even-better-toml",
+    "redhat.vscode-yaml",
+    "humao.rest-client"
+  ]
+}
