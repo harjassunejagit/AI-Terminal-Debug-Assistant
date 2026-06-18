@@ -13,7 +13,7 @@ CONFIG_FILE = CONFIG_DIR / "config.yaml"
 
 DEFAULTS = {
     "provider": "gemini",
-    "model": "gemini-1.5-flash",
+    "model": "gemini-2.5-flash",
     "ollama_base_url": "http://localhost:11434",
     "max_history": 50,
     "verbose": False,
@@ -23,13 +23,15 @@ DEFAULTS = {
 
 
 class Config:
+
     def __init__(
         self,
-        provider: str = None,
-        model: str = None,
-        verbose: bool = None,
-        auto_fix: bool = None,
+        provider: str | None = None,
+        model: str | None = None,
+        verbose: bool | None = None,
+        auto_fix: bool | None = None,
     ):
+
         file_cfg = self._load_file()
 
         self.provider = (
@@ -37,7 +39,7 @@ class Config:
             or os.getenv("DEBUGAI_PROVIDER")
             or file_cfg.get("provider")
             or DEFAULTS["provider"]
-        )
+        ).lower()
 
         self.model = (
             model
@@ -46,16 +48,25 @@ class Config:
             or DEFAULTS["model"]
         )
 
+        if self.provider == "gemini":
+            invalid = [
+                "gemini-1.5-flash",
+                "gemini-1.5-flash-latest",
+            ]
+
+            if self.model in invalid:
+                self.model = "gemini-2.5-flash"
+
         self.verbose = (
-            verbose
-            if verbose is not None
-            else (file_cfg.get("verbose", DEFAULTS["verbose"]))
+            file_cfg.get("verbose", DEFAULTS["verbose"])
+            if verbose is None
+            else verbose
         )
 
         self.auto_fix = (
-            auto_fix
-            if auto_fix is not None
-            else (file_cfg.get("auto_fix", DEFAULTS["auto_fix"]))
+            file_cfg.get("auto_fix", DEFAULTS["auto_fix"])
+            if auto_fix is None
+            else auto_fix
         )
 
         self.ollama_base_url = (
@@ -64,42 +75,67 @@ class Config:
             or DEFAULTS["ollama_base_url"]
         )
 
-        self.max_history = file_cfg.get("max_history", DEFAULTS["max_history"])
+        self.max_history = (
+            file_cfg.get("max_history", DEFAULTS["max_history"])
+        )
 
-        self.openai_api_key = os.getenv("OPENAI_API_KEY") or file_cfg.get("openai_api_key")
-        self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY") or file_cfg.get("anthropic_api_key")
-        self.gemini_api_key = os.getenv("GEMINI_API_KEY") or file_cfg.get("gemini_api_key")
+        self.openai_api_key = (
+            os.getenv("OPENAI_API_KEY")
+            or file_cfg.get("openai_api_key")
+        )
 
-    def _load_file(self) -> dict:
-        if CONFIG_FILE.exists():
-            try:
-                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                    data = yaml.safe_load(f)
-                    return data if isinstance(data, dict) else {}
-            except Exception:
-                return {}
-        return {}
+        self.anthropic_api_key = (
+            os.getenv("ANTHROPIC_API_KEY")
+            or file_cfg.get("anthropic_api_key")
+        )
+
+        self.gemini_api_key = (
+            os.getenv("GEMINI_API_KEY")
+            or file_cfg.get("gemini_api_key")
+        )
+
+    def _load_file(self):
+
+        if not CONFIG_FILE.exists():
+            return {}
+
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+                return data if isinstance(data, dict) else {}
+
+        except Exception:
+            return {}
 
     @classmethod
     def init_interactive(cls):
-        console.print("\n[bold cyan]🛠 DebugAI Setup Wizard[/bold cyan]\n")
+
+        console.print("\n🛠 DebugAI Setup Wizard\n")
 
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
         provider = Prompt.ask(
             "AI Provider",
-            choices=["gemini", "openai", "ollama", "anthropic"],
+            choices=[
+                "gemini",
+                "openai",
+                "ollama",
+                "anthropic",
+            ],
             default="gemini",
         )
 
         model_defaults = {
-            "gemini": "gemini-1.5-flash",
+            "gemini": "gemini-2.5-flash",
             "openai": "gpt-4o-mini",
             "ollama": "llama3",
             "anthropic": "claude-3-haiku-20240307",
         }
 
-        model = Prompt.ask("Model name", default=model_defaults[provider])
+        model = Prompt.ask(
+            "Model name",
+            default=model_defaults[provider],
+        )
 
         cfg = {
             "provider": provider,
@@ -107,37 +143,86 @@ class Config:
         }
 
         if provider == "gemini":
-            console.print("\n[dim]Get API key: https://aistudio.google.com/apikey[/dim]")
-            key = Prompt.ask("Gemini API Key", password=True, default="")
+
+            console.print(
+                "\nGet Gemini API key:\n"
+                "https://aistudio.google.com/apikey\n"
+            )
+
+            key = Prompt.ask(
+                "Gemini API Key",
+                password=True,
+                default="",
+            )
+
             if key:
                 cfg["gemini_api_key"] = key
 
         elif provider == "openai":
-            key = Prompt.ask("OpenAI API Key", password=True, default="")
+
+            key = Prompt.ask(
+                "OpenAI API Key",
+                password=True,
+                default="",
+            )
+
             if key:
                 cfg["openai_api_key"] = key
 
         elif provider == "anthropic":
-            key = Prompt.ask("Anthropic API Key", password=True, default="")
+
+            key = Prompt.ask(
+                "Anthropic API Key",
+                password=True,
+                default="",
+            )
+
             if key:
                 cfg["anthropic_api_key"] = key
 
         elif provider == "ollama":
-            url = Prompt.ask("Ollama base URL", default="http://localhost:11434")
-            cfg["ollama_base_url"] = url
 
-        cfg["verbose"] = Confirm.ask("Enable verbose output?", default=False)
-        cfg["auto_fix"] = Confirm.ask("Enable auto-fix?", default=False)
+            cfg["ollama_base_url"] = Prompt.ask(
+                "Ollama base URL",
+                default="http://localhost:11434",
+            )
 
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            yaml.dump(cfg, f, default_flow_style=False)
+        cfg["verbose"] = Confirm.ask(
+            "Enable verbose output?",
+            default=False,
+        )
 
-        console.print(f"\n[green]✓ Saved to {CONFIG_FILE}[/green]")
-        console.print("\nTry:\n  [cyan]debugai run \"python app.py\"[/cyan]\n")
-        print("CONFIG FILE EXECUTED")
+        cfg["auto_fix"] = Confirm.ask(
+            "Enable auto-fix?",
+            default=False,
+        )
+
+        with open(
+            CONFIG_FILE,
+            "w",
+            encoding="utf-8",
+        ) as f:
+            yaml.dump(
+                cfg,
+                f,
+                default_flow_style=False,
+            )
+
+        console.print(
+            f"\n✓ Saved to {CONFIG_FILE}\n"
+        )
+
+        console.print(
+            "Run:\n"
+            "python -m src.cli.main explain "
+            "\"ZeroDivisionError\"\n"
+        )
+
 
 if __name__ == "__main__":
-    print("MAIN BLOCK STARTED")
+
     cfg = Config()
+
+    print("MAIN BLOCK STARTED")
     print("PROVIDER:", cfg.provider)
     print("MODEL:", cfg.model)
